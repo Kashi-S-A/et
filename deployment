@@ -1,0 +1,113 @@
+----------------------------------------
+steps to deploy this on aws ec2 instance
+----------------------------------------
+step 1 : create a ubuntu instance. use 4GB ram
+			- add security inbound rules : HTTP,HTTPS,Custom(8080) for both IPv4 and IPv6(to access in mobile)
+			- and also 3306 for MYSQL
+			
+step 2 : install java in it.
+			sudo apt update
+			sudo apt install openjdk-17-jdk -y
+			java -version
+			
+step 3 : install mysql server
+			sudo apt install mysql-server -y
+			sudo mysql_secure_installation
+			
+			#Create DB + User:
+			sudo mysql -u root -p
+				
+			#create a database and a user and grant privilages	
+			CREATE DATABASE appdb;
+			CREATE USER 'appuser'@'%' IDENTIFIED BY 'StrongPassword';
+			GRANT ALL PRIVILEGES ON appdb.* TO 'appuser'@'%';
+			FLUSH PRIVILEGES;
+			
+			===================================================================
+			Error Case
+			===================================================================
+			1. Check if MySQL is running
+				sudo systemctl status mysql
+
+				#If not running:
+				sudo systemctl start mysql
+
+			2️. Check if MySQL is listening on port 3306
+				sudo lsof -i:3306
+
+				#If nothing prints → MySQL is NOT running or not bound to correct IP.
+
+			3️. Fix bind-address
+			#Edit MySQL config:
+				sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf
+
+			#Find:
+				bind-address = 127.0.0.1
+
+			#Change to:
+				bind-address = 0.0.0.0
+
+			#Restart:
+				sudo systemctl restart mysql
+
+			4️. Create user for remote login
+			#Login:
+				sudo mysql -u root -p
+
+			#Run:
+				CREATE USER 'appuser'@'%' IDENTIFIED BY 'Password123';
+				GRANT ALL PRIVILEGES ON *.* TO 'appuser'@'%';
+				FLUSH PRIVILEGES;
+
+			5️. Test MySQL locally
+				mysql -u appuser -p -h localhost
+			========================================================================
+							
+step 4 : configure application.properties(recommended create database with same name locally also)
+			spring.datasource.url=jdbc:mysql://localhost:3306/appdb
+			spring.datasource.username=appuser
+			spring.datasource.password=StrongPassword
+			spring.jpa.hibernate.ddl-auto=update
+			spring.jpa.show-sql=true
+			server.port=8080
+			
+step 5 : do maven install and get the jar file of the project and upload it the ec2 using command or MobaXterm
+			
+step 5 : Create a Systemd Service (Auto-Start)
+			sudo nano /etc/systemd/system/app.service
+			
+			#copy paste the following instructions
+			[Unit]
+			Description=Expense Tracker Spring Boot App
+			After=network.target
+
+			[Service]
+			User=ubuntu
+			WorkingDirectory=/home/ubuntu
+			ExecStart=/usr/bin/java -jar /home/ubuntu/app.jar
+			SuccessExitStatus=143
+			Restart=always
+			RestartSec=3
+
+			[Install]
+			WantedBy=multi-user.target
+			
+			#Save & exit.
+			#Reload:
+				sudo systemctl daemon-reload
+
+			#Start:
+				sudo systemctl start expense
+
+			#Enable auto-start on reboot:
+				sudo systemctl enable expense
+
+			#Check status:
+				sudo systemctl status expense
+
+step 6 : to check the logs of the app
+			cat app.log
+			tail -50 app.log
+			
+step 7 : Access application at
+			http://<your-ec2-ip>:8080			
